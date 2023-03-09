@@ -1,0 +1,116 @@
+# path to GAM
+$gam = "C:\GAM\gam.exe"
+
+# the threshold at which the alert will be sent
+# if more licenses than this, no alert is sent; if fewer, then it is sent
+$threshold = 100
+
+# there is no way yet to get this programmatically, so statically assign it
+$numArchiveLicTotal = "1600"
+
+# the product ID for archive licenses
+$gamArcProdID = "101034"
+
+# arguments for GAM
+$gamInfoDomainCommand = @("info", "domain")
+$gamPrintActiveLicCountCommand = @("print", "licenses", "sku", "gae", "countsonly")
+$gamPrintArchiveLicCountCommand = @("print", "licenses", "products", "$gamArcProdID", "countsonly")
+
+# run the commands
+$gamInfoDomainOutput = & "$gam" $gamInfoDomainCommand
+$gamPrintActiveLicCountOutput = & "$gam" $gamPrintActiveLicCountCommand
+
+try {
+    $gamPrintArchiveLicCountOutput = & "$gam" $gamPrintArchiveLicCountCommand
+
+    # parse the output
+    $archiveUsedLicPattern = "$gamArcProdID,(.*)"
+    $archiveUsedLics = [regex]::Match($gamPrintArchiveLicCountOutput, $archiveUsedLicPattern).Groups[1].Value
+
+    $archiveLicensesInUse = $totalUsers - $activeUsedLics
+    $archiveLicensesAvailable = $numArchiveLicTotal - $archiveLicensesInUse
+}
+catch {
+    # handle the error if the archive license count cannot be obtained
+    $archiveLicensesAvailable = "N/A"
+    Write-Host "Error retrieving archive license count: $_"
+}
+
+# parse the output
+$datePattern = "User counts as of (.*?):"
+$countDate = [regex]::Match($gamInfoDomainOutput,$datePattern).Groups[1].Value
+
+$licPattern = "Workspace Enterprise Plus Licenses: (.*)Workspace Enterprise Plus Users:"
+$numActiveTotal = [regex]::Match($gamInfoDomainOutput, $licPattern).Groups[1].Value
+$numActiveTotal = $numActiveTotal -replace "[^0-9]"
+
+$totalUsersPattern = "Total Users: (.*)"
+$totalUsers = [regex]::Match($gamInfoDomainOutput, $totalUsersPattern).Groups[1].Value
+$totalUsers = $totalUsers -replace "[^0-9]"
+
+$activeUsedLicPattern = "Google-Apps,1010020020,(.*)"
+$activeUsedLics = [regex]::Match($gamPrintActiveLicCountOutput, $activeUsedLicPattern).Groups[1].Value
+
+# calculate values
+$activeLicensesAvailable = $numActiveTotal - $activeUsedLics
+
+# don't send message if more than the threshold of both active and archive licenses
+# if ( ($activeLicensesAvailable -gt $threshold) -and ($archiveLicensesAvailable -gt $threshold) )
+# {
+#	exit 0
+# }
+
+$activeUsePercent = ($activeLicensesAvailable / $numActiveTotal).tostring("P")
+$archiveUsedLics = [regex]::Match($gamPrintArchiveLicCountOutput, $archiveUsedLicPattern).Groups[1].Value
+
+
+# calculate values
+$activeLicensesAvailable = $numActiveTotal - $activeUsedLics
+$archiveLicensesInUse = $totalUsers - $activeUsedLics
+$archiveLicensesAvailable = $numArchiveLicTotal - $archiveLicensesInUse
+
+# don't send message if more than the threshold of both active and archive licenses
+# if ( ($activeLicensesAvailable -gt $threshold) -and ($archiveLicensesAvailable -gt $threshold) )
+# {
+#	exit 0
+# }
+
+$activeUsePercent = ($activeLicensesAvailable / $numActiveTotal).tostring("P")
+$archiveUsePercent = ($archiveLicensesAvailable / $numArchiveLicTotal).tostring("P")
+
+$timestamp = Get-Date
+
+# compose the headers
+$mailServer = "smtp.finishline.com"
+$toAddress = "googlelicensealerts@finishline.com"
+$fromAddress = "GoogleAdmin_NoReply@finishline.com"
+$subject = "Google licenses report"
+
+# compose the body
+$body = "Report run on $timestamp.`n"
+$body = $body + "Total number of active licenses is $numActiveTotal.`n"
+$body = $body + "Total number of active licenses in use is $activeUsedLics.`n"
+$body = $body + "Total number of active licenses available is $activeLicensesAvailable.`n"
+$body = $body + "Percent of active licenses available is $activeUsePercent.`n"
+$body = $body + "`n"
+$body = $body + "Archive license report date is $countDate.`n"
+$body = $body + "Total number of archive licenses is $numArchiveLicTotal.`n"
+$body = $body + "Total number of archive licenses in use is $archiveUsedLics.`n"
+$body = $body + "Total number of archive licenses available is $archiveLicensesAvailable.`n"
+$body = $body + "Percent of archive licenses available is $archiveUsePercent.`n"
+$body = $body + "`n"
+$body = $body + "Archive license totals are likely to be inconsistent with the console and with each other due to the inability to get real-time data on these counts.`n"
+$body = $body + "`n"
+$body = $body + "To make more licenses available, do the following in this order:`n"
+$body = $body + "1. Perform a user purge.`n"
+$body = $body + "2. Perform any pending user account terminations.`n"
+$body = $body + "3. Archive termed user accounts.`n"
+$body = $body + "4. Perform any pending user account creations.`n"
+
+# send the message
+# Send-MailMessage -SmtpServer $mailServer -To $toAddress -From $fromAddress -Subject $subject -Body $body
+Write-Host $body
+Write-Host "test test"
+
+# exit
+exit 0
