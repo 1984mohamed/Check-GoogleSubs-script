@@ -1,0 +1,10 @@
+usage: check_google_subs.py [-h] [--sku SKU] [--status STATUS] [--start_date START_DATE] [--end_date END_DATE] [--output OUTPUT]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --sku SKU             filter subscriptions by SKU (default: None)
+  --status STATUS       filter subscriptions by status (default: active)
+  --start_date START_DATE
+                        filter subscriptions by start date (default: None)
+  --end_date END_DATE   filter subscriptions by end date (default: None)
+  --output OUTPUT       output file path (default: subscriptions.csv)
